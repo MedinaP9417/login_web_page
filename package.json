@@ -1,0 +1,9 @@
+{
+  "name": "login_web_page",
+  "version": "1.0.0",
+  "main": "index.js",
+  "repository": "https://github.com/MedinaP9417/login_web_page.git",
+  "author": "Medina Pilavdzic <medina.pilavdzic@gmail.com>",
+  "license": "MIT",
+  "private": true
+}
