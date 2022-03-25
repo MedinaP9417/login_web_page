@@ -17,6 +17,7 @@ app.use(express.urlencoded({ extended: false }));
 app.use(cors());
 app.use(express.json());
 
+
 app.use(
   session({
     secret: "secret",
@@ -43,11 +44,16 @@ app.get("/users/login", checkAuthenticated, (req, res) => {
 app.get("/users/dashboard", checkNotAuthenticated, (req, res) => {
   res.render("dashboard", { user: req.user.name });
 });
+app.get("/users/dashboard", checkNotAuthenticated, (req, res) => {
+  res.render("dashboard", { user: req.user.email });
+});
 app.get("/users/logout", (req, res) => {
   req.logOut();
   req.flash("success_msq", "You have logged out.");
   res.redirect("/users/login");
 });
+
+
 app.post("/users/register", async (req, res) => {
   let { name, email, password, password2 } = req.body;
 
@@ -120,6 +126,116 @@ app.post(
   })
 );
 
+app.post("/users/register", async (req, res) => {
+  try {
+    let { name, email, password, password2 } = req.body;
+
+    console.log({
+      name,
+      email,
+      password,
+      password2,
+    });
+
+    let errors = [];
+
+    if (!name || !email || !password || !password2) {
+      errors.push({ message: "Please enter all fields" });
+    }
+    if (password.length < 6) {
+      errors.push({
+        message: "Password should be at least 6 characters long!",
+      });
+    }
+    if (password !== password2) {
+      errors.push({ message: "Password do not match" });
+    }
+    if (errors.length > 0) {
+      res.render("register", { errors });
+    } else {
+      let hashedPassword = await bcrypt.hash(password, 10);
+      console.log(hashedPassword);
+
+      pool.query(
+        `SELECT * FROM users
+      WHERE email = $1`,
+        [email],
+        (err, results) => {
+          if (err) {
+            throw err;
+          }
+          console.log(results.rows);
+          if (results.rows.length > 0) {
+            errors.push({ message: "Email already registered!" });
+            res.render("register", { errors });
+          } else {
+            pool.query(
+              `INSERT INTO users (name, email, password)
+                VALUES ($1, $2, $3)
+                RETURNING id, password`,
+              [name, email, hashedPassword],
+              (err, results) => {
+                if (err) {
+                  throw err;
+                }
+                console.log(results.rows);
+                req.flash(
+                  "success_msq",
+                  "You are now registered. Please log in."
+                );
+                res.redirect("/users/login");
+              }
+            );
+          }
+        }
+      );
+    }
+    const newUser = await pool.query(
+      "INSERT INTO user VALUES($1) RETURNING *",
+      [name, email, password, password2]
+    );
+    res.json(newUser.rows[0]);
+  } catch (err) {
+    console.error(err.message);
+  }
+});
+
+
+app.post("/users/register", async (req, res) => {
+ try {
+   const { name, email, password } = req.body;
+
+   const user = new User({ name, email, password });
+   const newUser = await pool.query(
+     "INSERT INTO user (description) VALUES($1, $2, $3) RETURNING *",
+     [name, email, password]
+   );
+   res.json(newUser.rows[0]);
+
+   res.send("User Registered successfully");
+ } catch (error) {
+   return res.status(400).json({ message: error });
+ }
+});
+
+app.post("/users/login", async (req, res) => {
+
+  try {
+      const { email, password } = req.body;
+
+    const user = await user.find({ email, password });
+ 
+  passport.authenticate("local", {
+    successRedirect: "/users/dashboard",
+    failureRedirect: "/users/login",
+    failureFlash: true,
+  });
+
+  } catch (error) {
+    return res.status(400).json({ message: "Something went wrong" });
+  }
+});
+
 app.post("/users/dashboard/questions", async (req, res) => {
   try {
     // console.log(req.body)
@@ -133,6 +249,7 @@ app.post("/users/dashboard/questions", async (req, res) => {
     console.error(err.message);
   }
 });
+
 
 app.get("/users/dashboard/questions", async (req, res) => {
   try {
